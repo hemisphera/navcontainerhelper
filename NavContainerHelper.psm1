@@ -1,5 +1,3 @@
-#Requires -PSEdition Desktop 
-
 Set-StrictMode -Version 2.0
 
 $verbosePreference = "SilentlyContinue"
@@ -26,9 +24,9 @@ if (!(Test-Path -Path $extensionsFolder -PathType Container)) {
 
     if (!$isAdministrator) {
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 3, 'InheritOnly', 'Allow')
-        $acl = [System.IO.Directory]::GetAccessControl($hostHelperFolder)
+        $acl = Get-Acl -Path $hostHelperFolder
         $acl.AddAccessRule($rule)
-        [System.IO.Directory]::SetAccessControl($hostHelperFolder,$acl)
+        Set-Acl -Path $hostHelperFolder -AclObject $acl
     }
 }
 

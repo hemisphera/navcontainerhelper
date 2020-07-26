@@ -42,7 +42,8 @@ function Check-NavContainerHelperPermissions {
             Write-Host "Checking permissions to $hostHelperFolder"
         }
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 3, 'InheritOnly', 'Allow')
-        $access = [System.IO.Directory]::GetAccessControl($hostHelperFolder).Access | 
+        $acl = Get-Acl $hostHelperFolder
+        $access = $acl.Access | 
                     Where-Object { $_.IdentityReference -eq $rule.IdentityReference -and $_.FileSystemRights -eq $rule.FileSystemRights -and $_.AccessControlType -eq $rule.AccessControlType -and $_.InheritanceFlags -eq $rule.InheritanceFlags }
         
         if ($access) {
@@ -59,9 +60,9 @@ function Check-NavContainerHelperPermissions {
                     Param($myUsername, $hostHelperFolder)
                     try {
                         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 3, 'InheritOnly', 'Allow')
-                        $acl = [System.IO.Directory]::GetAccessControl($hostHelperFolder)
+                        $acl = Get-Acl $hostHelperFolder
                         $acl.AddAccessRule($rule)
-                        [System.IO.Directory]::SetAccessControl($hostHelperFolder,$acl) 
+                        Set-Acl -Path $hostHelperFolder -AclObject $acl
                         EXIT 0
                     } catch {
                         EXIT 1
@@ -83,7 +84,8 @@ function Check-NavContainerHelperPermissions {
                 Write-Host "Checking permissions to $hostsFile"
             }
             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'Modify', 'Allow')
-            $access = [System.IO.Directory]::GetAccessControl($hostsFile).Access | 
+            $acl = Get-Acl $hostsFile
+            $access = $acl.Access | 
                         Where-Object { $_.IdentityReference -eq $rule.IdentityReference -and $_.FileSystemRights -eq $rule.FileSystemRights -and $_.AccessControlType -eq $rule.AccessControlType }
     
             if ($access) {
@@ -100,9 +102,9 @@ function Check-NavContainerHelperPermissions {
                         Param($myUsername, $hostsFile)
                         try {
                             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'Modify', 'Allow')
-                            $acl = [System.IO.Directory]::GetAccessControl($hostsFile)
+                            $acl = Get-Acl $hostsFile
                             $acl.AddAccessRule($rule)
-                            [System.IO.Directory]::SetAccessControl($hostsFile,$acl) 
+                            Set-Acl -Path $hostsFile -AclObject $acl
                             EXIT 0
                         } catch {
                             EXIT 1
@@ -166,9 +168,9 @@ function Check-NavContainerHelperPermissions {
                         Param($myUsername, $npipe)
                         try {
                             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 'Allow')
-                            $acl = [System.IO.Directory]::GetAccessControl($npipe)
+                            $acl = Get-Acl $npipe
                             $acl.AddAccessRule($rule)
-                            [System.IO.Directory]::SetAccessControl($npipe,$acl) 
+                            Set-Acl -Path $npipe -AclObject $acl
                             exit 0
                         } catch {
                             exit 1

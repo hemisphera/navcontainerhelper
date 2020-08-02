@@ -155,7 +155,7 @@ function Get-NavContainerAuth {
     }
 }
 
-function Check-NavContainerName {
+function Check-BcContainerName {
     Param
     (
         [string]$containerName = ""
@@ -190,7 +190,7 @@ function AssumeNavContainer {
 
     $inspect = docker inspect $containerOrImageName | ConvertFrom-Json
     if ($inspect.Config.Labels.psobject.Properties.Match('maintainer').Count -eq 0 -or $inspect.Config.Labels.maintainer -ne "Dynamics SMB") {
-        throw "Container $containerOrImageName is not a NAV container"
+        throw "Container $containerOrImageName is not a Business Central container"
     }
     [System.Version]$version = $inspect.Config.Labels.version
 
@@ -238,7 +238,7 @@ function Expand-7zipArchive {
     $7zipPath = "$env:ProgramFiles\7-Zip\7z.exe"
 
     $use7zip = $false
-    if ($navContainerHelperConfig.use7zipIfAvailable -and (Test-Path -Path $7zipPath -PathType Leaf)) {
+    if ($bcContainerHelperConfig.use7zipIfAvailable -and (Test-Path -Path $7zipPath -PathType Leaf)) {
         try {
             $use7zip = [decimal]::Parse([System.Diagnostics.FileVersionInfo]::GetVersionInfo($7zipPath).FileVersion, [System.Globalization.CultureInfo]::InvariantCulture) -ge 19
         }

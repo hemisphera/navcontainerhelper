@@ -13,6 +13,8 @@
   This allows you to specify a number of scripts you want to copy to the c:\run\my folder in the container (override functionality)
  .Parameter skipDatabase
   Adding this parameter creates an image without a database
+ .Parameter multitenant
+  Adding this parameter creates an image with multitenancy
 #>
 function New-NavImage {
     Param (
@@ -23,7 +25,8 @@ function New-NavImage {
         [string] $isolation = "",
         [string] $memory = "",
         $myScripts = @(),
-        [switch] $skipDatabase
+        [switch] $skipDatabase,
+        [switch] $multitenant
     )
 
     if ($memory -eq "") {
@@ -94,13 +97,13 @@ function New-NavImage {
         }
     }
 
-    $genericTag = [Version](Get-NavContainerGenericTag -containerOrImageName $baseImage)
+    $genericTag = [Version](Get-BcContainerGenericTag -containerOrImageName $baseImage)
     Write-Host "Generic Tag: $genericTag"
     if ($genericTag -lt [Version]"0.1.0.1") {
         throw "Generic tag must be at least 0.1.0.1. Cannot build image based on $genericTag"
     }
 
-    $containerOsVersion = [Version](Get-NavContainerOsVersion -containerOrImageName $baseImage)
+    $containerOsVersion = [Version](Get-BcContainerOsVersion -containerOrImageName $baseImage)
     if ("$containerOsVersion".StartsWith('10.0.14393.')) {
         $containerOs = "ltsc2016"
     }
@@ -140,16 +143,32 @@ function New-NavImage {
     }
 
     if ($hostOsVersion -eq $containerOsVersion) {
-        if ($isolation -eq "") { $isolation = "process" }
+        if ($isolation -eq "") { 
+            $isolation = "process"
+        }
     }
     else {
         if ($isolation -eq "") {
-            $isolation = "hyperv"
+            if ($isAdministrator) {
+                if (Get-HypervState -ne "Disabled") {
+                    $isolation = "hyperv"
+                }
+                else {
+                    $isolation = "process"
+                    Write-Host "WARNING: Host OS and Base Image Container OS doesn't match and Hyper-V is not installed. If you encounter issues, you could try to install Hyper-V."
+                }
+            }
+            else {
+                $isolation = "hyperv"
+                Write-Host "WARNING: Host OS and Base Image Container OS doesn't match, defaulting to hyperv. If you do not have Hyper-V installed or you encounter issues, you could try to specify -isolation process"
+            }
+
         }
         elseif ($isolation -eq "process") {
-            Write-Host "WARNING: Host OS and Base Image Container OS doesn't match and process isolation is specified. If you encounter issues, please try hyperv instead."
+            Write-Host "WARNING: Host OS and Base Image Container OS doesn't match and process isolation is specified. If you encounter issues, you could try to specify -isolation hyperv"
         }
     }
+    Write-Host "Using $isolation isolation"
 
     $downloadsPath = (Get-ContainerHelperConfig).bcartifactsCacheFolder
     if (!(Test-Path $downloadsPath)) {
@@ -193,6 +212,9 @@ function New-NavImage {
                 }
             }
         }
+
+        Write-Host "Files in $($myfolder):"
+        get-childitem -Path $myfolder | % { Write-Host "- $($_.Name)" }
 
         $artifactPaths = Download-Artifacts -artifactUrl $artifactUrl -includePlatform
         $appArtifactPath = $artifactPaths[0]
@@ -274,6 +296,13 @@ function New-NavImage {
             $skipDatabaseLabel = "skipdatabase=""Y"" \`n"
         }
 
+        $multitenantLabel = ""
+        $multitenantParameter = ""
+        if ($multitenant) {
+            $multitenantLabel = "multitenant=""Y"" \`n"
+            $multitenantParameter = " -multitenant"
+        }
+
 @"
 FROM $baseimage
 
@@ -282,13 +311,13 @@ ENV DatabaseServer=localhost DatabaseInstance=SQLEXPRESS DatabaseName=CRONUS IsB
 COPY my /run/
 COPY NAVDVD /NAVDVD/
 
-RUN \Run\start.ps1 -installOnly
+RUN \Run\start.ps1 -installOnly$multitenantParameter
 
 LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
       created="$([DateTime]::Now.ToUniversalTime().ToString("yyyyMMddHHmm"))" \
       nav="$nav" \
       cu="$cu" \
-      $($skipDatabaseLabel)country="$($appManifest.Country)" \
+      $($skipDatabaseLabel)$($multitenantLabel)country="$($appManifest.Country)" \
       version="$($appmanifest.Version)" \
       platform="$($appManifest.Platform)"
 "@ | Set-Content (Join-Path $buildFolder "DOCKERFILE")

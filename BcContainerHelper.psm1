@@ -5,7 +5,7 @@ $warningPreference = 'Continue'
 $errorActionPreference = 'Stop'
 
 if ([intptr]::Size -eq 4) {
-    throw "NavContainerHelper cannot run in Windows PowerShell (x86), need 64bit mode"
+    throw "ContainerHelper cannot run in Windows PowerShell (x86), need 64bit mode"
 }
 
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -16,53 +16,50 @@ try {
     $myUsername = (whoami)
 }
 
-$hostHelperFolder = "C:\ProgramData\NavContainerHelper"
-$extensionsFolder = Join-Path $hostHelperFolder "Extensions"
-if (!(Test-Path -Path $extensionsFolder -PathType Container)) {
-    New-Item -Path $hostHelperFolder -ItemType Container -Force -ErrorAction Ignore | Out-Null
-    New-Item -Path $extensionsFolder -ItemType Container -Force -ErrorAction Ignore | Out-Null
-
-    if (!$isAdministrator) {
-        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 3, 'InheritOnly', 'Allow')
-        $acl = Get-Acl -Path $hostHelperFolder
-        $acl.AddAccessRule($rule)
-        Set-Acl -Path $hostHelperFolder -AclObject $acl
-    }
-}
-
-$containerHelperFolder = "C:\ProgramData\NavContainerHelper"
-
-$NavContainerHelperVersion = Get-Content (Join-Path $PSScriptRoot "Version.txt")
-
-$sessions = @{}
-
 function Get-ContainerHelperConfig {
-    if (!((Get-Variable -scope Script navContainerHelperConfig -ErrorAction SilentlyContinue) -and $navContainerHelperConfig)) {
-        Set-Variable -scope Script -Name navContainerHelperConfig -Value @{
+    if (!((Get-Variable -scope Script bcContainerHelperConfig -ErrorAction SilentlyContinue) -and $bcContainerHelperConfig)) {
+        Set-Variable -scope Script -Name bcContainerHelperConfig -Value @{
             "bcartifactsCacheFolder" = "c:\bcartifacts.cache"
             "genericImageName" = 'mcr.microsoft.com/dynamicsnav:{0}-generic'
             "usePsSession" = $isAdministrator
             "use7zipIfAvailable" = $true
             "defaultNewContainerParameters" = @{ }
+            "hostHelperFolder" = "C:\ProgramData\BcContainerHelper"
+            "containerHelperFolder" = "C:\ProgramData\BcContainerHelper"
+            "defaultContainerName" = "bcserver"
         }
-        $navContainerHelperConfigFile = Join-Path $containerHelperFolder "NavContainerHelper.config.json"
-        if (Test-Path $navContainerHelperConfigFile) {
-            $savedConfig = Get-Content $navContainerHelperConfigFile | ConvertFrom-Json
-            $keys = $navContainerHelperConfig.Keys | % { $_ }
+        $bcContainerHelperConfigFile = Join-Path $bcContainerHelperConfig.HostHelperFolder "BcContainerHelper.config.json"
+        if (Test-Path $bcContainerHelperConfigFile) {
+            $savedConfig = Get-Content $bcContainerHelperConfigFile | ConvertFrom-Json
+            $keys = $bcContainerHelperConfig.Keys | % { $_ }
             $keys | % {
                 if ($savedConfig.PSObject.Properties.Name -eq "$_") {
                     Write-Host "Setting $_ = $($savedConfig."$_")"
-                    $navContainerHelperConfig."$_" = $savedConfig."$_"
+                    $bcContainerHelperConfig."$_" = $savedConfig."$_"
         
                 }
             }
         }
-        Export-ModuleMember -Variable navContainerHelperConfig
+        Export-ModuleMember -Variable bcContainerHelperConfig
     }
-    return $navContainerHelperConfig
+    return $bcContainerHelperConfig
 }
 
 Get-ContainerHelperConfig | Out-Null
+
+$hypervState = ""
+function Get-HypervState {
+    if ($isAdministrator -and $hypervState -eq "") {
+        $feature = Get-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V -Online
+        if ($feature) {
+            $script:hypervState = $feature.State
+        }
+        else {
+            $script:hypervState = "Disabled"
+        }
+    }
+    return $script:hypervState
+}
 
 $Source = @"
 	using System.Net;
@@ -90,10 +87,30 @@ $Source = @"
  
 Add-Type -TypeDefinition $Source -Language CSharp -WarningAction SilentlyContinue | Out-Null
 
-. (Join-Path $PSScriptRoot "HelperFunctions.ps1")
-. (Join-Path $PSScriptRoot "Check-NavContainerHelperPermissions.ps1")
+$hostHelperFolder = $bcContainerHelperConfig.HostHelperFolder
+$extensionsFolder = Join-Path $hostHelperFolder "Extensions"
+$containerHelperFolder = $bcContainerHelperConfig.ContainerHelperFolder
 
-Check-NavContainerHelperPermissions -Silent
+$BcContainerHelperVersion = Get-Content (Join-Path $PSScriptRoot "Version.txt")
+
+$sessions = @{}
+
+if (!(Test-Path -Path $extensionsFolder -PathType Container)) {
+    New-Item -Path $hostHelperFolder -ItemType Container -Force -ErrorAction Ignore | Out-Null
+    New-Item -Path $extensionsFolder -ItemType Container -Force -ErrorAction Ignore | Out-Null
+
+    if (!$isAdministrator) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($myUsername,'FullControl', 3, 'InheritOnly', 'Allow')
+        $acl = [System.IO.Directory]::GetAccessControl($hostHelperFolder)
+        $acl.AddAccessRule($rule)
+        [System.IO.Directory]::SetAccessControl($hostHelperFolder,$acl)
+    }
+}
+
+. (Join-Path $PSScriptRoot "HelperFunctions.ps1")
+. (Join-Path $PSScriptRoot "Check-BcContainerHelperPermissions.ps1")
+
+Check-BcContainerHelperPermissions -Silent
 
 # Container Info functions
 . (Join-Path $PSScriptRoot "ContainerInfo\Get-NavContainerNavVersion.ps1")

@@ -27,6 +27,7 @@ function Get-ContainerHelperConfig {
             "hostHelperFolder" = "C:\ProgramData\BcContainerHelper"
             "containerHelperFolder" = "C:\ProgramData\BcContainerHelper"
             "defaultContainerName" = "bcserver"
+            "sandboxContainersAreMultitenantByDefault" = $true
         }
         $bcContainerHelperConfigFile = Join-Path $bcContainerHelperConfig.HostHelperFolder "BcContainerHelper.config.json"
         if (Test-Path $bcContainerHelperConfigFile) {
@@ -200,6 +201,7 @@ Check-BcContainerHelperPermissions -Silent
 . (Join-Path $PSScriptRoot "AppHandling\Clean-BcContainerDatabase.ps1")
 . (Join-Path $PSScriptRoot "AppHandling\Add-GitToAlProjectFolder.ps1")
 . (Join-Path $PSScriptRoot "AppHandling\Sort-AppFoldersByDependencies.ps1")
+. (Join-Path $PSScriptRoot "AppHandling\Run-AlPipeline.ps1")
 
 # Tenant Handling functions
 . (Join-Path $PSScriptRoot "TenantHandling\New-NavContainerTenant.ps1")
@@ -239,6 +241,7 @@ Check-BcContainerHelperPermissions -Silent
 . (Join-Path $PSScriptRoot "Misc\Copy-FileFromNavContainer.ps1")
 . (Join-Path $PSScriptRoot "Misc\Copy-FileToNavContainer.ps1")
 . (Join-Path $PSScriptRoot "Misc\Add-FontsToNavContainer.ps1")
+. (Join-Path $PSScriptRoot "Misc\Set-BcContainerFeatureKeys.ps1")
 . (Join-Path $PSScriptRoot "Misc\Import-PfxCertificateToNavContainer.ps1")
 
 # Company Handling functions

@@ -1,7 +1,50 @@
+1.0.5
+Added PREVIEW function Run-AlPipeline
+Issue #1252 do not return artifact url for artifacts without platform (unless -doNotCheckPlatform is specified)
+Issue #1263 new-bccontainertenant freezes if -updatehosts isn't specified
+Add switch -includePerformanceToolkit to Import-TestToolkitToBcContainer and New-BcContainer
+Support for -includePerformanceToolkit in New-BcContainerWizard
+Support for insider builds and sasToken in New-BcContainerWizard
+Add NAV to New-BcContainerWizard
+Add AL Language Extension version selection to New-BcContainerWizard
+
+1.0.4
+Sort-AppFoldersByDependencies doesn't support custom Application app (needs to be sorted first)
+Add parameter -addFontsFromPath to New-BcContainer and New-BcImage
+Increase performance of Add-FontsToBcContainer
+Ensure that Import-TestToolkitToBcContainer can be called repeatedly
+Include TestToolkit in cached image if possible
+Add parameter -forceRebuild to New-NavContainer to force a rebuild of a cached image
+Pull new generic if not at least 0.1.0.16 (to ensure download fixes)
+Add/Remove hostnames for tenants to hosts file when multitenancy and -updatehosts
+New-BcContainerWizard to support -includeAL and -multitenant
+Added new function Set-BcContainerFeatureKeys to enable/disable feature keys in tenant databases
+Add parameter -featureKeys to New-BcContainer to enable/disable feature keys in all tenants in new container
+Issue #1243 - Get-BcContainerImageTags and Get-BcContainerImageLabels doesn't work if TLS 1.2 isn't enabled
+
+1.0.3
+Issue #1215 New-BcContainer with -useBestContainerOS and -useNewDatabase fails with multitenant sandbox images
+Issue #1220 Generate-SymbolsInNavContainer.ps1 does not have BC alias
+Fix missing pre-requisites
+
+1.0.2
+Issue #1202 New-BcContainer gives wrong message if no artifactUrl nor imagename is specified
+Cleanup terminology
+Issue #1203 Export-BcContainerObjects doesn't exist
+Issue #1169 add parameter to Setup-BcContainerTestUsers to select which users to add (Essential or Premium) to avoid mixed plans
+References to Get-BcContainerNavUser needs to be replaced with Get-BcContainerBcUser
+Add SSL option for New-BcContainerWizard
+
 1.0.1
 Copy-FileToBcContainer and Copy-FileFromBcContainer didn't support that hostHelperFolder and containerHelperFolder was different
 Get-TestsFromBcContainer and Run-TestsInBcContainer didn't support that hostHelperFolder and containerHelperFolder was different
 Issue #1174 do not use hyperv isolation if Hyper-V isn't installed
+Issue #1180 New-BcContainerWizard doesn't work (if BcContainerHelper is installed in standard path)
+Change NavContainerhelper to BcContainerHelper in New-BcContainerWizard
+Sandbox containers are multitenant by default (as SaaS is multitenant!)
+Issue #1191 New-BcImage should add the same auto-tag as New-BcContainer
+Issue #1190 New-BcImage will return imagename after generation
+Issue #1195 New-BcContainer sometimes uses a different image than the one created
 
 1.0.0
 Change module name to BcContainerHelper

@@ -11,9 +11,7 @@
  .Parameter containerName
   Name of the new Container (if the container already exists it will be replaced)
  .Parameter imageName
-  Name of the image you want to use for your Container (default is to grab the imagename from the navserver container)
- .Parameter useArtifacts
-  Temporary parameter, in which you can specify a storage account url, in which build artifacts are expected to live. ImageName is translated to an artifact Url if you specify this.
+  Name of the image you want to use for your Container
  .Parameter artifactUrl
   Url for application artifact to use. If you also specify an ImageName, an image will be build (if it doesn't exist) using these artifacts and that will be run.
  .Parameter dvdPath
@@ -72,6 +70,8 @@
   Avoid exporting objects for baseline from the container (Saves time, but you will not be able to use the object handling functions without the baseline)
  .Parameter alwaysPull
   Always pull latest version of the docker image
+ .Parameter forceRebuild
+  Force a rebuild of the cached image even if the generic image or os hasn't changed
  .Parameter useBestContainerOS
   Use the best Container OS based on the Host OS. If the OS doesn't match, a better public generic image is selected.
  .Parameter useGenericImage
@@ -80,6 +80,10 @@
   Assign Premium plan to admin user
  .Parameter multitenant
   Setup container for multitenancy by adding this switch
+ .Parameter addFontsFromPath
+  Enumerate all fonts from this path and install them in the container
+ .Parameter featureKeys
+  Optional hashtable of featureKeys, which can be applied to the container database
  .Parameter clickonce
   Specify the clickonce switch if you want to have a clickonce version of the Windows Client created
  .Parameter includeTestToolkit
@@ -88,6 +92,8 @@
   Specify this parameter to avoid including the standard tests when adding includeTestToolkit
  .Parameter includeTestFrameworkOnly
   Only import TestFramework (do not import Test Codeunits nor TestLibraries)
+ .Parameter includePerformanceToolkit
+  Include the performance toolkit app (only 17.x and later)
  .Parameter restart
   Define the restart option for the container
  .Parameter auth
@@ -197,14 +203,18 @@ function New-BcContainer {
         [switch] $enableTaskScheduler,
         [switch] $doNotExportObjectsToText,
         [switch] $alwaysPull,
+        [switch] $forceRebuild,
         [switch] $useBestContainerOS,
         [string] $useGenericImage,
         [switch] $assignPremiumPlan,
         [switch] $multitenant,
+        [string] $addFontsFromPath = "",
+        [hashtable] $featureKeys = $null,
         [switch] $clickonce,
         [switch] $includeTestToolkit,
         [switch] $includeTestLibrariesOnly,
         [switch] $includeTestFrameworkOnly,
+        [switch] $includePerformanceToolkit,
         [ValidateSet('no','on-failure','unless-stopped','always')]
         [string] $restart='unless-stopped',
         [ValidateSet('Windows','NavUserPassword','UserPassword','AAD')]
@@ -366,10 +376,19 @@ function New-BcContainer {
 
     Write-Host "Docker Server Version is $dockerServerVersion"
 
+    $doNotGetBestImageName = $false
     $skipDatabase = $false
+    if ($bakFile -ne "" -or $databaseServer -ne "" -or $databaseInstance -ne "" -or $databaseName -ne "") {
+        $skipDatabase = $true
+    }
 
     # Remove if it already exists
     Remove-BcContainer $containerName
+
+    if ($artifactUrl) {
+        # When using artifacts, you always use best container os - no need to replatform
+        $useBestContainerOS = $false
+    }
 
     if ($imageName -eq "") {
         Write-Host "Fetching all docker images"
@@ -389,20 +408,12 @@ function New-BcContainer {
             }
         }
         else {
-            if ($bakFile -ne "" -or $databaseServer -ne "" -or $databaseInstance -ne "" -or $databaseName -ne "") {
-                $skipDatabase = $true
-            }
-    
+            $autotag = $false
             Write-Host "ArtifactUrl and ImageName specified"
             if (!$imageName.Contains(':')) {
                 $appUri = [Uri]::new($artifactUrl)
                 $imageName += ":$($appUri.AbsolutePath.Replace('/','-').TrimStart('-'))"
-                if ($skipDatabase) {
-                    $imageName += "-nodb"
-                }
-                if ($multitenant) {
-                    $imageName += "-mt"
-                }
+                $autotag = $true
             }
 
             $buildMutexName = "img-$imageName"
@@ -425,8 +436,30 @@ function New-BcContainer {
                 $appArtifactPath = Download-Artifacts -artifactUrl $artifactUrl -forceRedirection:$alwaysPull
                 $appManifestPath = Join-Path $appArtifactPath "manifest.json"
                 $appManifest = Get-Content $appManifestPath | ConvertFrom-Json
-        
-                $rebuild = $false
+
+                if ($appManifest.PSObject.Properties.name -eq "isBcSandbox") {
+                    if ($appManifest.isBcSandbox) {
+                        if (!($PSBoundParameters.ContainsKey('multitenant')) -and !$skipDatabase) {
+                            $multitenant = $bcContainerHelperConfig.sandboxContainersAreMultitenantByDefault
+                        }
+                    }
+                }
+                $mtImage = $multitenant
+                if ($useNewDatabase -or $useCleanDatabase) {
+                    $mtImage = $false
+                }
+
+                $dbstr = ""
+                if ($skipDatabase) {
+                    if ($autotag) { $imageName += "-nodb" }
+                    $dbstr = " without database"
+                }
+                $mtstr = ""
+                if ($mtImage) {
+                    if ($autotag) { $imageName += "-mt" }
+                    $mtstr = " multitenant"
+                }
+
                 if ($allImages | Where-Object { $_ -eq $imageName }) {
                     try {
                         Write-Host "Image $imageName already exists"
@@ -441,42 +474,42 @@ function New-BcContainer {
                         $imageArtifactUrl = ($inspect.config.env | ? { $_ -like "artifactUrl=*" }).SubString(12).Split('?')[0]
                         if ($imageArtifactUrl -ne $artifactUrl.Split('?')[0]) {
                             Write-Host "Image $imageName was build with artifactUrl $imageArtifactUrl, should be $($artifactUrl.Split('?')[0])"
-                            $rebuild = $true
+                            $forceRebuild = $true
                         }
                         if ($inspect.Config.Labels.version -ne $appManifest.Version) {
                             Write-Host "Image $imageName was build with version $($inspect.Config.Labels.version), should be $($appManifest.Version)"
-                            $rebuild = $true
+                            $forceRebuild = $true
                         }
                         elseif ($inspect.Config.Labels.Country -ne $appManifest.Country) {
                             Write-Host "Image $imageName was build with version $($inspect.Config.Labels.version), should be $($appManifest.Version)"
-                            $rebuild = $true
+                            $forceRebuild = $true
                         }
                         elseif ($inspect.Config.Labels.osversion -ne $labels.osversion) {
                             Write-Host "Image $imageName was build for OS Version $($inspect.Config.Labels.osversion), should be $($labels.osversion)"
-                            $rebuild = $true
+                            $forceRebuild = $true
                         }
                         elseif ($inspect.Config.Labels.tag -ne $labels.tag) {
                             Write-Host "Image $imageName has generic Tag $($inspect.Config.Labels.tag), should be $($labels.tag)"
-                            $rebuild = $true
+                            $forceRebuild = $true
                         }
                        
                         if (($inspect.Config.Labels.PSObject.Properties.Name -eq "Multitenant") -and ($inspect.Config.Labels.Multitenant -eq "Y")) {
-                            if (!$multitenant) {
+                            if (!$mtImage) {
                                 Write-Host "Image $imageName was build multi tenant, should have been single tenant"
-                                $rebuild = $true
+                                $forceRebuild = $true
                             }
                         }
                         else {
-                            if ($multitenant) {
+                            if ($mtImage) {
                                 Write-Host "Image $imageName was build single tenant, should have been multi tenant"
-                                $rebuild = $true
+                                $forceRebuild = $true
                             }
                         }
              
                         if (($inspect.Config.Labels.PSObject.Properties.Name -eq "SkipDatabase") -and ($inspect.Config.Labels.SkipDatabase -eq "Y")) {
                             if (!$skipdatabase) {
                                 Write-Host "Image $imageName was build without a database, should have a database"
-                                $rebuild = $true
+                                $forceRebuild = $true
                             }
                         }
                         else {
@@ -484,17 +517,31 @@ function New-BcContainer {
                         }
                     }
                     catch {
-                        $rebuild = $true
+                        $forceRebuild = $true
                     }
                 }
                 else {
                     Write-Host "Image $imageName doesn't exist"
-                    $rebuild = $true
+                    $forceRebuild = $true
                 }
-                if ($rebuild) {
-                    Write-Host "Building image $imageName based on $($artifactUrl.Split('?')[0])"
+                if ($forceRebuild) {
+                    Write-Host "Building$mtstr image $imageName based on $($artifactUrl.Split('?')[0])$dbstr"
                     $startTime = [DateTime]::Now
-                    New-Bcimage -artifactUrl $artifactUrl -imageName $imagename -isolation $isolation -baseImage $useGenericImage -memory $memoryLimit -skipDatabase:$skipDatabase -multitenant:$multitenant
+                    New-Bcimage `
+                        -artifactUrl $artifactUrl `
+                        -imageName $imagename `
+                        -isolation $isolation `
+                        -baseImage $useGenericImage `
+                        -memory $memoryLimit `
+                        -skipDatabase:$skipDatabase `
+                        -multitenant:$mtImage `
+                        -addFontsFromPath $addFontsFromPath `
+                        -licenseFile $licensefile `
+                        -includeTestToolkit:$includeTestToolkit `
+                        -includeTestFrameworkOnly:$includeTestFrameworkOnly `
+                        -includeTestLibrariesOnly:$includeTestLibrariesOnly `
+                        -includePerformanceToolkit:$includePerformanceToolkit
+
                     $timespend = [Math]::Round([DateTime]::Now.Subtract($startTime).Totalseconds)
                     Write-Host "Building image took $timespend seconds"
                     if (-not ($allImages | Where-Object { $_ -eq $imageName })) {
@@ -504,6 +551,7 @@ function New-BcContainer {
                 $artifactUrl = ""
                 $alwaysPull = $false
                 $useGenericImage = ""
+                $doNotGetBestImageName = $true
             }
             finally {
                 $buildMutex.ReleaseMutex()
@@ -580,12 +628,25 @@ function New-BcContainer {
             else {
                 $imageName = Get-BestGenericImageName
             }
-        } elseif (Test-BcContainer -containerName navserver) {
-            $imageName = Get-BcContainerImageName -containerName navserver
+        } elseif (Test-BcContainer -containerName $bcContainerHelperConfig.defaultContainerName) {
+            $artifactUrl = Get-BcContainerArtifactUrl -containerName $bcContainerHelperConfig.defaultContainerName
+            if ($artifactUrl) {
+                if ($useGenericImage) {
+                    $imageName = $useGenericImage
+                }
+                else {
+                    $imageName = Get-BestGenericImageName
+                }
+            }
+            else {
+                $imageName = Get-BcContainerImageName -containerName $bcContainerHelperConfig.defaultContainerName
+            }
         } else {
-            $imageName = Get-BestBcContainerImageName -imageName "mcr.microsoft.com/businesscentral/onprem"
-            $alwaysPull = $true
+            throw "You have to specify artifactUrl or imageName when creating a new container."            
         }
+        $bestImageName = $imageName
+    }
+    elseif ($doNotGetBestImageName) {
         $bestImageName = $imageName
     }
     else {
@@ -615,7 +676,7 @@ function New-BcContainer {
             $imageName = $bestImageName
             if ($artifactUrl) {
                 $genericTagVersion = [Version](Get-BcContainerGenericTag -containerOrImageName $imageName)
-                if ($genericTagVersion -lt [Version]"0.1.0.5") {
+                if ($genericTagVersion -lt [Version]"0.1.0.16") {
                     Write-Host "Generic image is version $genericTagVersion - pulling a newer image"
                     $pullit = $true
                 }
@@ -732,6 +793,9 @@ function New-BcContainer {
         if ($appManifest.PSObject.Properties.name -eq "isBcSandbox") {
             if ($appManifest.isBcSandbox) {
                 $bcstyle = "sandbox"
+                if (!($PSBoundParameters.ContainsKey('multitenant')) -and !$skipDatabase) {
+                    $multitenant = $bcContainerHelperConfig.sandboxContainersAreMultitenantByDefault
+                }
             }
         }
 
@@ -820,6 +884,12 @@ function New-BcContainer {
 
     Write-Host "Version: $navversion"
     Write-Host "Style: $bcStyle"
+    if ($multitenant) {
+        Write-Host "Multitenant: Yes"
+    }
+    else {
+        Write-Host "Multitenant: No"
+    }
 
     $version = [System.Version]($navversion.split('-')[0])
     if ($dvdPlatform) {
@@ -1385,12 +1455,20 @@ Get-NavServerUser -serverInstance $ServerInstance -tenant default |? LicenseType
           . (Join-Path $runPath $MyInvocation.MyCommand.Name)
         ') | Set-Content -Path "$myfolder\SetupVariables.ps1"
     }
-    Copy-Item -Path (Join-Path $PSScriptRoot "updatehosts.ps1") -Destination $myfolder -Force
 
     if ($updateHosts) {
+        Copy-Item -Path (Join-Path $PSScriptRoot "updatehosts.ps1") -Destination (Join-Path $myfolder "updatehosts.ps1") -Force
         $parameters += "--volume ""c:\windows\system32\drivers\etc:C:\driversetc"""
         ('
-. (Join-Path $PSScriptRoot "updatehosts.ps1") -hostsFile "c:\driversetc\hosts" -theHostname '+$containername+' -theIpAddress $ip
+. (Join-Path $PSScriptRoot "updatehosts.ps1") -hostsFile "c:\driversetc\hosts" -theHostname "$hostname" -theIpAddress $ip
+if ($multitenant) {
+    $dotidx = $hostname.indexOf(".")
+    if ($dotidx -eq -1) { $dotidx = $hostname.Length }
+    Get-NavTenant -serverInstance $serverInstance | % {
+        $tenantHostname = $hostname.insert($dotidx,"-$($_.Id)")
+        . (Join-Path $PSScriptRoot "updatehosts.ps1") -hostsFile "c:\driversetc\hosts" -theHostname $tenantHostname -theIpAddress $ip
+    }
+}
 ') | Add-Content -Path "$myfolder\AdditionalOutput.ps1"
 
     ('
@@ -1400,8 +1478,9 @@ Get-NavServerUser -serverInstance $ServerInstance -tenant default |? LicenseType
     }
     else {
 
+        Copy-Item -Path (Join-Path $PSScriptRoot "updatehosts.ps1") -Destination (Join-Path $myfolder "updatecontainerhosts.ps1") -Force
     ('
-. (Join-Path $PSScriptRoot "updatehosts.ps1")
+. (Join-Path $PSScriptRoot "updatecontainerhosts.ps1")
 ') | Add-Content -Path "$myfolder\SetupVariables.ps1"
 
     }
@@ -1574,6 +1653,14 @@ if (-not `$restartingInstance) {
         } -argumentList ($SqlServerMemoryLimit)
     }
 
+    if ($addFontsFromPath) {
+        Add-FontsToBcContainer -containerName $containerName -path $addFontsFromPath
+    }
+
+    if ($featureKeys) {
+        Set-BcContainerFeatureKeys -containerName $containerName -featureKeys $featureKeys
+    }
+
     if ("$TimeZoneId" -ne "") {
         Write-Host "Set TimeZone in Container to $TimeZoneId"
         Invoke-ScriptInBcContainer -containerName $containerName -scriptblock { Param($TimeZoneId)
@@ -1617,11 +1704,14 @@ if (-not `$restartingInstance) {
                 }
 
                 if ($webClientUrl.Contains('?')) {
-                    $webClientUrl += "&page=$pageno"
+                    $webClientUrl += "&page="
                 } else {
-                    $webClientUrl += "?page=$pageno"
+                    $webClientUrl += "?page="
                 }
-                New-DesktopShortcut -Name "$containerName Test Tool" -TargetPath "$webClientUrl" -IconLocation "C:\Program Files\Internet Explorer\iexplore.exe, 3" -Shortcuts $shortcuts
+                New-DesktopShortcut -Name "$containerName Test Tool" -TargetPath "$webClientUrl$pageno" -IconLocation "C:\Program Files\Internet Explorer\iexplore.exe, 3" -Shortcuts $shortcuts
+                if ($includePerformanceToolkit) {
+                    New-DesktopShortcut -Name "$containerName Performance Tool" -TargetPath "$($webClientUrl)149000" -IconLocation "C:\Program Files\Internet Explorer\iexplore.exe, 3" -Shortcuts $shortcuts
+                }
             }
             
         }
@@ -1655,7 +1745,7 @@ if (-not `$restartingInstance) {
         Remove-BcContainerSession -containerName $containerName
     }
 
-    if ($version -eq [System.Version]"16.0.11240.12076" -and $devCountry -ne "W1") {
+    if ((($version -eq [System.Version]"16.0.11240.12076") -or ($version -eq [System.Version]"16.0.11240.12085")) -and $devCountry -ne "W1") {
         $url = "https://bcdocker.blob.core.windows.net/public/12076-patch/$($devCountry.ToUpper()).zip"
         Write-Host "Downloading new test apps for this version from $url"
         $zipName = Join-Path $containerFolder "16.0.11240.12076-$devCountry-Tests-Patch"
@@ -1695,7 +1785,13 @@ if (-not `$restartingInstance) {
         }
     
         if ($includeTestToolkit) {
-            Import-TestToolkitToBcContainer -containerName $containerName -sqlCredential $sqlCredential -includeTestLibrariesOnly:$includeTestLibrariesOnly -includeTestFrameworkOnly:$includeTestFrameworkOnly -doNotUseRuntimePackages:$doNotUseRuntimePackages
+            Import-TestToolkitToBcContainer `
+                -containerName $containerName `
+                -sqlCredential $sqlCredential `
+                -includeTestLibrariesOnly:$includeTestLibrariesOnly `
+                -includeTestFrameworkOnly:$includeTestFrameworkOnly `
+                -includePerformanceToolkit:$includePerformanceToolkit `
+                -doNotUseRuntimePackages:$doNotUseRuntimePackages
         }
     }
 
@@ -1742,7 +1838,7 @@ if (-not `$restartingInstance) {
             $originalFolder = Join-Path $ExtensionsFolder "Original-$navversion"
             if (!(Test-Path $originalFolder)) {
                 # Export base objects
-                Export-BcContainerObjects -containerName $containerName `
+                Export-NavContainerObjects -containerName $containerName `
                                            -objectsFolder $originalFolder `
                                            -filter "" `
                                            -sqlCredential $sqlCredential `
@@ -1802,7 +1898,7 @@ if (-not `$restartingInstance) {
             $originalFolder = Join-Path $ExtensionsFolder "Original-$navversion-newsyntax"
             if (!(Test-Path $originalFolder)) {
                 # Export base objects as new syntax
-                Export-BcContainerObjects -containerName $containerName `
+                Export-NavContainerObjects -containerName $containerName `
                                            -objectsFolder $originalFolder `
                                            -filter "" `
                                            -sqlCredential $sqlCredential `
@@ -1910,6 +2006,19 @@ if (-not `$restartingInstance) {
         Write-Host "Dev Service:       $devUrl"
         Write-Host "File downloads:    $dlUrl"
     }
+
+    Write-Host
+    Write-Host "Use:"
+    Write-Host -ForegroundColor Yellow -NoNewline "Get-BcContainerEventLog -containerName $containerName"
+    Write-Host " to retrieve a snapshot of the event log from the container"
+    Write-Host -ForegroundColor Yellow -NoNewline "Get-BcContainerDebugInfo -containerName $containerName"
+    Write-Host  " to get debug information about the container"
+    Write-Host -ForegroundColor Yellow -NoNewline "Enter-BcContainer -containerName $containerName"
+    Write-Host " to open a PowerShell prompt inside the container"
+    Write-Host -ForegroundColor Yellow -NoNewline "Remove-BcContainer -containerName $containerName"
+    Write-Host " to remove the container again"
+    Write-Host -ForegroundColor Yellow -NoNewline "docker logs $containerName"
+    Write-Host " to retrieve information about URL's again"
 }
 Set-Alias -Name New-NavContainer -Value New-BcContainer
 Export-ModuleMember -Function New-BcContainer -Alias New-NavContainer

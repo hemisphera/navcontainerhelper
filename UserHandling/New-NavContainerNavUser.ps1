@@ -5,7 +5,7 @@
   Creates a new user in a NAV/BC container.
   If the Container is multitenant, the user will be added to a specified tenant
  .Parameter containerName
-  Name of the container in which you want to create the user (default navserver)
+  Name of the container in which you want to create the user
  .Parameter tenant
   Name of tenant in which you want to create a user
  .Parameter Credential
@@ -23,9 +23,9 @@
  .Parameter databaseCredential
   Database Credential if using AssignPremiumPlan with foreign database connection
  .Example
-  New-BcContainerNavUser -containerName test -tenantId mytenant -credential $credential
+  New-BcContainerBcUser -containerName test -tenantId mytenant -credential $credential
  .Example
-  New-BcContainerNavUser -containerName test -tenantId mytenant -WindowsAccount freddyk -PermissionSetId SUPER
+  New-BcContainerBcUser -containerName test -tenantId mytenant -WindowsAccount freddyk -PermissionSetId SUPER
 #>
 function New-BcContainerBcUser {
     Param (

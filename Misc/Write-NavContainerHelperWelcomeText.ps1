@@ -79,8 +79,8 @@ function Write-BcContainerHelperWelcomeText {
     Write-Host "Remove-BcContainerTenant        Remove tenant from multitenant Business Central container"
     Write-Host 
     Write-Host -ForegroundColor Yellow "User handling functions"
-    Write-Host "Get-BcContainerNavUser          Get all users in Business Central container"
-    Write-Host "New-BcContainerNavUser          Create new Nav User in Business Central container"
+    Write-Host "Get-BcContainerBcUser           Get all users in Business Central container"
+    Write-Host "New-BcContainerBcUser           Create new Nav User in Business Central container"
     Write-Host "New-BcContainerWindowsUser      Create new Windows User in Business Central container"
     Write-Host "Setup-BcContainerTestUsers      Create a set of users for test purposes"
     Write-Host 
@@ -98,7 +98,7 @@ function Write-BcContainerHelperWelcomeText {
     Write-Host "Create-AadUsersInBcContainer    Create all active users in the Aad in the Business Central container"
     Write-Host
     Write-Host -ForegroundColor Yellow "Azure VM specific functions"
-    Write-Host "Replace-NavServerContainer       Replace or recreate navserver (primary) container"
+    Write-Host "Replace-BcServerContainer        Replace or recreate bcserver (primary) container"
     Write-Host "New-LetsEncryptCertificate       Create Lets Encrypt Certificate for secure communication"
     Write-Host "Renew-LetsEncryptCertificate     Renew Lets Encrypt Certificate for secure communication"
     Write-Host

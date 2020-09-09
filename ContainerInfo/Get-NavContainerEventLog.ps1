@@ -18,26 +18,24 @@ function Get-BcContainerEventLog {
     [CmdletBinding()]
     Param (
         [string] $containerName = $bcContainerHelperConfig.defaultContainerName,
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [string] $logname = "Application",
         [switch] $doNotOpen
     )
 
     Process {
+
+        $doNotOpen = $true # wevutil is not supported on PS Core
+
         Write-Host "Getting event log for $containername"
 
-        $containerFolder = Join-Path $ExtensionsFolder $containerName
-        $myFolder = Join-Path $containerFolder "my"
-        $folder = Get-BcContainerPath -containerName $containerName -Path $myFolder
-        $name = $containerName + ' ' + [DateTime]::Now.ToString("yyyy-MM-dd HH.mm.ss") + ".evtx"
-        Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { Param([string]$path, [string]$logname) 
-            wevtutil epl $logname "$path"
-        } -ArgumentList (Join-Path $folder $name), $logname
+        Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { 
+            Param([string]$logname) 
+            Get-EventLog -LogName $logname
+        } -ArgumentList $logname
 
-        if (!$doNotOpen) {
-            [Diagnostics.Process]::Start((Join-Path -Path $myFolder $name)) | Out-Null
-        }
     }
 }
+
 Set-Alias -Name Get-NavContainerEventLog -Value Get-BcContainerEventLog
 Export-ModuleMember -Function Get-BcContainerEventLog -Alias Get-NavContainerEventLog

@@ -18,22 +18,54 @@ function Get-BcContainerEventLog {
     [CmdletBinding()]
     Param (
         [string] $containerName = $bcContainerHelperConfig.defaultContainerName,
+        
         [Parameter(Mandatory = $false)]
         [string] $logname = "Application",
-        [switch] $doNotOpen
+
+        [switch] $doNotOpen,
+        
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("EvtxFile", "InProcess")]
+        [string] $OutputType = "EvtxFile"
     )
 
     Process {
 
-        $doNotOpen = $true # wevutil is not supported on PS Core
-
         Write-Host "Getting event log for $containername"
 
-        Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { 
-            Param([string]$logname) 
-            Get-EventLog -LogName $logname
-        } -ArgumentList $logname
+        if ($doNotOpen) {
+            Write-Warning "The parameter 'doNotOpen' is not supported and is always treated as '`$true'"
+        }
 
+        $Session = New-PSSession -ContainerId (Get-BcContainerId $containerName) -RunAsAdministrator
+        try {
+
+            if ($OutputType -ieq "EvtxFile") {
+                $Filename = $containerName + ' ' + [DateTime]::Now.ToString("yyyy-MM-dd HH.mm.ss") + ".evtx"
+                $ContainerFilename = Invoke-Command -Session $Session -ScriptBlock { 
+                    Param([string]$logname)
+                    $LocalFilename = "$env:TEMP\$([Guid]::NewGuid()).evtx"
+                    $EventSession = New-Object System.Diagnostics.Eventing.Reader.EventLogSession 
+                    $EventSession.ExportLog($LogName, "LogName", "*", $LocalFilename)
+                    Write-Output $LocalFilename
+                } -ArgumentList $logname
+
+                $HostFilename = "$env:TEMP\$Filename"
+                Copy-Item -FromSession $Session -Path $ContainerFilename -Destination $HostFilename -Force
+                Write-Output $HostFilename
+            }
+
+            if ($OutputType -ieq "InProcess") {
+                $Result = Invoke-Command -Session $Session -ScriptBlock { 
+                    Param([string] $logname) 
+                    Get-EventLog -LogName $logname -Newest 1024
+                } -ArgumentList $logname
+                Write-Output $Result
+            }
+        }
+        finally {
+            if ($Session) { Remove-PSSession $Session }
+        }
     }
 }
 

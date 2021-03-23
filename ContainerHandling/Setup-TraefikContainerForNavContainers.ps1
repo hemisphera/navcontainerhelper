@@ -24,6 +24,10 @@
  .Parameter forceHttpWithTraefik
   Use this parameter to force http (disable SSL) although traefik is used. This will mean that the mobile apps and
   the modern Windows app won't work
+ .Parameter doNotPublishAdminPort
+  Add this switch to avoid publishing the traefik admin port 8080 on the host
+ .Parameter additionalParameters
+  Additional parameters for the traefik container. Example @("-e OVH_ENDPOINT=my-ovh-endpoing")
  .Example
   Setup-TraefikContainerForBcContainers -PublicDnsName "dev.mycorp.com" -ContactEMailForLetsEncrypt admin@mycorp.com
  .Example
@@ -39,7 +43,7 @@ function Setup-TraefikContainerForBcContainers {
         [switch] $overrideDefaultBinding,
         [string] $IP = "",
         [Parameter(Mandatory=$false)]
-        [string] $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik_https.toml"),
+        [string] $traefikToml = "",
         [Parameter(Mandatory=$true, ParameterSetName="OwnCertificate")]
         [string] $CrtFile,
         [Parameter(Mandatory=$true, ParameterSetName="OwnCertificate")]
@@ -47,15 +51,33 @@ function Setup-TraefikContainerForBcContainers {
         [Switch] $Recreate,
         [ValidateSet('','process','hyperv')]
         [string] $isolation = "",
-        [switch] $forceHttpWithTraefik
+        [switch] $forceHttpWithTraefik,
+        [switch] $doNotPublishAdminPort,
+        [string[]] $additionalParameters = @()
     )
 
     Process {
         $traefikForBcBasePath = "c:\programdata\bccontainerhelper\traefikforbc"
-        $traefikDockerImage = "stefanscherer/traefik-windows:v1.7.12"
+        $traefikDockerImage = "traefik:v1.7-windowsservercore-1809"
         $traefiktomltemplate = (Join-Path $traefikForBcBasePath "config\template_traefik.toml")
-        if ($forceHttpWithTraefik) {
-            $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik.toml")
+        
+        if ("$traefikToml" -eq "") {
+            if ($PSCmdlet.ParameterSetName -eq "OwnCertificate") {
+                if ($forceHttpWithTraefik) {
+                    $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik_own.toml")
+                }
+                else {
+                    $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik_https_own.toml")
+                }
+            }
+            else {
+                if ($forceHttpWithTraefik) {
+                    $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik.toml")
+                }
+                else {
+                    $traefikToml = (Join-Path $PSScriptRoot "traefik\template_traefik_https.toml")
+                }
+            }
         }
         $CrtFilePath = (Join-Path $traefikForBcBasePath "config\certificate.crt")
         $CrtKeyFilePath = (Join-Path $traefikForBcBasePath "config\certificate.key")
@@ -149,14 +171,26 @@ function Setup-TraefikContainerForBcContainers {
             New-NetFirewallRule -DisplayName "Allow 8180" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8180
         }
 
-        Log "Pulling and running traefik"
-        docker pull $traefikDockerImage
-        if ($isolation) {
-            docker run -p 8080:8080 -p 443:443 -p 80:80 --restart always --isolation $isolation -d -v ((Join-Path $traefikForBcBasePath "config") + ":c:/etc/traefik") -v \\.\pipe\docker_engine:\\.\pipe\docker_engine $traefikDockerImage --docker.endpoint=npipe:////./pipe/docker_engine
+        $pullRequired = "$(docker images -q $traefikDockerImage)" -eq ""
+        if ($pullRequired) {
+            Log "Pulling traefik"
+            docker pull $traefikDockerImage
         }
         else {
-            docker run -p 8080:8080 -p 443:443 -p 80:80 --restart always -d -v ((Join-Path $traefikForBcBasePath "config") + ":c:/etc/traefik") -v \\.\pipe\docker_engine:\\.\pipe\docker_engine $traefikDockerImage --docker.endpoint=npipe:////./pipe/docker_engine
+            Log "Traefik image already up to date"
         }
+        
+        $parameters = @("-p 443:443", "-p 80:80", "--restart always", "-v ""$(Join-Path $traefikForBcBasePath "config"):c:/etc/traefik""", "-v \\.\pipe\docker_engine:\\.\pipe\docker_engine")
+        if (!$doNotPublishAdminPort) {
+            $parameters += @("-p 8080:8080")
+        }
+        if ($isolation) {
+            $parameters += "--isolation $isolation"
+        }
+        $parameters += $additionalParameters
+
+        Log "Running traefik"
+        DockerDo -command run -imageName "$traefikDockerImage --docker.endpoint=npipe:////./pipe/docker_engine" -detach -parameters $parameters
     }
 }
 Set-Alias -Name Setup-TraefikContainerForNavContainers -Value Setup-TraefikContainerForBcContainers

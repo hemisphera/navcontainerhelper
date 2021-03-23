@@ -20,10 +20,10 @@ Function Replace-DependenciesInAppFile {
         [Parameter(Mandatory=$true)]
         [string] $Path,
         [string] $Destination = $Path,
-        [Parameter(Mandatory=$true)]
-        [hashtable] $replaceDependencies,
+        [hashtable] $replaceDependencies = $null,
         [ValidateSet('Ignore','True','False','Check')]
-        [string] $ShowMyCode = "Ignore"
+        [string] $ShowMyCode = "Ignore",
+        [switch] $replacePackageId
     )
 
     if ($path -ne $Destination) {
@@ -31,7 +31,7 @@ Function Replace-DependenciesInAppFile {
         $path = $Destination
     }
     
-    Invoke-ScriptInBCContainer -containerName $containerName -scriptBlock { Param($path, $Destination, $replaceDependencies, $ShowMyCode)
+    Invoke-ScriptInBCContainer -containerName $containerName -scriptBlock { Param($path, $Destination, $replaceDependencies, $ShowMyCode, $replacePackageId)
     
         add-type -path (Get-Item "C:\Program Files\Microsoft Dynamics NAV\*\Service\system.io.packaging.dll").FullName
     
@@ -82,6 +82,7 @@ Function Replace-DependenciesInAppFile {
                     $changes = $true
                 }
             }
+
             if ($replaceDependencies) {
                 $manifest.Package.Dependencies.GetEnumerator() | % {
                     $dependency = $_
@@ -95,6 +96,11 @@ Function Replace-DependenciesInAppFile {
                         $changes = $true
                     }
                 }
+            }
+
+            if ($replacePackageId) {
+                $packageId = [Guid]::NewGuid()
+                $changes = $true
             }
     
             if ($changes) {
@@ -132,6 +138,6 @@ Function Replace-DependenciesInAppFile {
                 $fs.Close()
             }
         }
-    } -argumentList (Get-BCContainerPath -containerName $containerName -path $path -throw), (Get-BCContainerPath -containerName $containerName -path $Destination -throw), $replaceDependencies, $ShowMyCode
+    } -argumentList (Get-BCContainerPath -containerName $containerName -path $path -throw), (Get-BCContainerPath -containerName $containerName -path $Destination -throw), $replaceDependencies, $ShowMyCode, $replacePackageId
 }
 Export-ModuleMember -Function Replace-DependenciesInAppFile

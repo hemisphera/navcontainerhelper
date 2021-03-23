@@ -1,3 +1,274 @@
+2.0.8
+Issue #1812: Allow passing an array of paths to all "font" parameters
+PR #1799 Add support for Service principal in Create-AadAppsForNav
+PR #1801 Support SqlServer PS module in Restore-BcDatabaseFromArtifacts.ps1
+Issue #1794 AssignPremiumPlan fails when using external database
+Issue #1810 Publish-NavContainerApp is not using Publish-NAVApp -Force which leads to user interaction in some situations
+Issue #1790 Add caching option SandboxArtifacts to flush-ContainerHelperCache to only flush sandbox artifacts
+Issue #1822 Copy-AlSourceFiles doesn't support entitlement, permissionset and permissionsetextension
+Issue #1820 Add SqlTimeout to New-BcContainer - default is and was always 300 (= 5 minutes)
+
+2.0.7
+Support -bakFile and -replaceExternalDatabases together on New-BcContainer
+Support for preProcessorSymbols in Compile-AppInBcContainer and Run-AlPipeline
+Issue #1720 add suppressBuildSearchIndex to Import-ObjectsToNavContainer
+Add function Get-PlainText
+Run-AlCops sometimes shows the exception instead of the AppSource failures
+Get-BcArtifactUrl returns an older publicpreview version instead of a newer insider build
+
+2.0.6
+Issue #1696 Compile-AppInBcContainer does not throw error on missing RDLC
+Add AddInsFolder parameter to Convert-BcAppsToRuntimePackages
+Issue #1712 Get-NavContainerAppRuntimePackage doesn't return a path when the license is about to expire
+Issue #1710 UploadImportAndApply-ConfigPackageInBcContainer doesn't work with filename
+Issue #1709 Add switch GenerateSymbolReference to Compile-ObjectsInNavContainer.ps1
+Issue #1722 add containername to PowerShell and Command prompts
+Issue #1706 App generation failed without info after fixing #1696
+Issue Cannot download symbols for apps with special characters
+Issue #1728 Get-BcContainerApp doesn't return the appFile
+Support that bcartifactsCacheFolder, containerHelperFolder and dvdPath can be a docker volume instead of a bind mount (for performance)
+Run-AlValidation doesn't fail getting the same app in apps and previousApps (if apps in the middle of the dependency chain hasn't changed)
+Run-AlCops doesn't use previousApp if it is the same version as the app
+Issue #1704 Run-AlValidation with "preprocessorSymbols"
+Issue #1729 Second container on same external database causes previous containers to stop working
+Issue #1739 Publish-BcContainerApp fails with "The remote server returned an error: (403) Forbidden
+Issue #1736 Support specifying a folder (of apps) to Run-AlValidation, Run-AlCops, Run-AlPipeline, Publish-BcContainerApp, Publish-PerTenantExtensionApps and Convert-BcAppsToRuntimePackages
+Issue #1740 Missing help for disabledTests parameter
+Issue #1744 if New-BcAuthContext with client credentials fails, the real error is not shown
+Issue #1726 Add switch -throwOnError to Run-AlValidation
+Issue #1747 Unwanted multitenant image when using replaceExternalDatabases
+Allow running sandbox artifacts in "onprem mode" (from version 18.0 with generic image tag 1.0.1.4 or higher)
+Issue #1749 User not created when using replaceExternalDatabases and cached images
+
+2.0.5
+Issue #1668 Run-AlValidation fails if app filename has a comma (and there is only one app)
+Issue #1675 Convert-BcAppsToRuntimePackages doesn't work with only one app.
+Issue #1678 Setup-BcContainerTestUsers fails on version 18
+Issue #1682 add silent mode to import module
+Flush-ContainerHelperCache will also cleanup generic images not matching your OS
+Add BcAuthContext parameter to functions Create-AadAppsForNav, Create-AadUsersInBcContainer and Replace-BcServerContainer (note that resource should be https://graph.windows.net)
+Modify Run-ConnectionTestToBcContainer to connect and open Extension Management. Basically check whether people can uninstall your app.
+
+2.0.4
+Remove-BcEnvironment fails after waiting for environment removal
+Import-TestToolkitToBcContainer fails when installing apps in online environment unless a container called bcserver exists
+Add parameter -replacePackageId to Replace-DependenciesInAppFile to allow process to change package id in an app
+Add parameter -replacePackageId to Publish-BcContainerApp to allow process to change package id in an app
+Run-AlPipeline using a BcSaaS Sandbox environment to use replacePackageId when publishing previousApps and add delay to avoid conflicts
+New-BcEnvironment to wait for other environments being created before creating
+Specifying TestRunnerOnly installs all tests when not using online SaaS environments
+Add parameter applicationInsightsKey to Run-AlPipeline to stamp applicationInsightsKey into app.json for all apps
+
+2.0.3
+Issue #1655 variable $scopes not set
+Issue #1654 and #1656 Publish-BcContainerApp where the filename contains a comma fails.
+New Function Get-BcInstalledExtensions to return installed extensions (including PTEs) from an online Business Central environment
+New function New-BcDatabaseExport to start a new Database Export from an online Business Central environment
+New function Get-BcDatabaseExportHistory to get the Database Export History from an online Business Central tenant/environment
+
+2.0.2
+Allow no credentials with filesOnly containers
+Connect from inside the container to SaaS environment in Install-BcAppFromAppSource and Run-ConnectionTestToBcContainer to avoid file locks
+Add parameter allowInstallationOnProduction to Install-BcAppFromAppSource to allow installation in production environments
+Publish-BcContainerApp was refactored to reuse the appfiles unpacking mechanism from Run-AlValidation and more
+
+2.0.1
+Issue #1646 Get-BcArtifactUrl has decome a low slower with 2.0.0
+Issue #1645 Build Partially Succeeded - revert behavior
+
+2.0.0
+Issue #1596 support URLs in previousApps in Run-AlValidation
+Issue #1606 do not prune when creating images
+Remove compatibility for ancient generic image versions from New-BcContainer
+New function New-BcAuthContext to create an authContext for BC SaaS based on credentials, a refresh token or a device login
+New function Renew-BcAuthContext to renew an authContext for BC SaaS if necessary
+Added parameteres bcAuthContext and environment to Compile-AppInBcContainer to allow Compile-AppInBcContainer to download symbols from BC SaaS
+Added parameteres bcAuthContext and environment to Publish-AppToBcContainer to allow Publish-AppToBcContainer to publish apps to BC SaaS
+Issue #1613 wrong display of reclaimed space
+Added parameters after and before to Get-BcArtifactUrl to filter out artifacts created before after or after before
+Added outcome First to the Select parameter in Get-BcArtifactUrl to allow grabbing the first artifact mathing a filter
+Added new function Install-BcAppFromAppSource to install an AppSource App into a BC SaaS environment
+Added parameter includeTestRunnerOnly to Import-TestToolkitToBcContainer to allow importing only Test Runner
+Added parameteres bcAuthContext and environment to Import-TestToolkitToBcContainer to allow running tests on BC SaaS Sandbox environments (Test Runner is the only app in AppSource at the moment, TestFramework apps will be added)
+Added parameteres bcAuthContext and environment to Run-TestsInBcContainer to allow running tests on BC SaaS Sandbox environments
+Better stacktrace when exception happens in Invoke-ScriptInBcContainer
+Added parameteres bcAuthContext and environment to Run-AlPipeline to allow running a pipeline using BC SaaS Sandbox environments
+Issue #1591 added parameter failOn to Run-AlPipeline to allow builds to fail on warnings
+Issue #1623 Unable to create BC 16.0 container with tests
+Support FilesOnly when generating images
+Use FilesOnly generic image for better performance
+Publish-PerTenantExtensionApps to support bcAuthContext as parameter set (as well as clientId, clientSecret and tenantId for compatibility)
+Add functions New-BcEnvironment, Remove-BcEnvironment and Set-BcEnvironmentApplicationInsightsKey
+Issue #1636 Signing fails in FilesOnly-container
+Added function Convert-BcAppsToRuntimePackages to convert a set of Apps to runtime packages matching a specific BC version and localization
+Added Parameter ContainerName to Sort-AppFilesByDependencies to allow the function to sort runtime packages using Get-NavAppInfo in container
+
+1.0.19
+Move retry algorithm to Download-File
+Run-AlValidation will try to determine which versions to run validation against if not specified
+Run-AlValidation and Run-AlCopys to support that SupportedCountries is optional
+Issue #1573 Regression Setup-TraefikContainerForBcContainers stopped working in 1.0.18
+Issue #1542 Convert-AlcOutputToAzureDevOps wrong error output
+
+1.0.18
+Issue #1556 DotNet Packages for ZipArchive missing in VS Code when creating a Base App
+Issue #1559 Handling of Hungary artifacts
+Issue #1563 Run-AlValidation with multiple apps fails
+Run-AlValidation to support urls as apps, previousapps and installapps
+Add parameter CopySymbolsFromContainer to Compile-AppInBcContainer to speed up symbols download
+Use CopySymbolsFromContainer in Run-AlCops
+Issue #1568 Add publisher parameter to Unpublish and Uninstall app
+Issue #1566 Sign-BcContainerApp doesn't work with SHA256
+Retry algorithm added to Sign-BcContainerApp
+Add Parameter -doNotPublishAdminPort to Setup-TraefikContainerForBcContainers
+Add Parameter -additionalParameters to Setup-TraefikContainerForBcContainers
+Issue #1577 Run-AlValidation and Extract-AppFileToFolder require absolute paths
+Issue #1579 Change default timeStampServer and digestAlgorithm
+
+1.0.17
+Issue #1494 Creating another container based on existing artifact
+Add additional information when publishing through dev Endpoint (instead of just Unprocessible Entity)
+Issue #1530 Not able to Run-AlValidation without previous app.
+Issue #1537 Issue with file lock when creating image
+Use configured containerName in Run-AlCops and Run-AlValidation
+Add parameter -skipAppSourceCop to Run-AlValidation
+Add mapCountryCode to $bcContainerHelperConfig
+Use mapCountryCode in Get-BcArtifactUrl to allow getting artifacts for countries which doesn't have own artifacts
+Use mapCountryCode in Run-AlValidation to allow running validation for all countries (max. 1 time per artifact)
+Issue #1536 Random running Test failure
+Run-AlValidation use single tenant containers by default for performance
+Add resilience to ClientContext::GetAllForms
+Issue #1550 and #1497 add digestAlgorithm parameter to Sign-BcContainerApp
+Run-AlCops (and Run-AlValidation) could ignore error AS0088
+Issue #1552 PowerShell sometimes uses 8-3 notation for $env:temp
+
+1.0.16
+Issue #1516 Sort-AppFoldersByDependencies can't handle twice the same app in the baseFolder
+Issue #1519 Extract-AppFileToFolder doesn't extract internalsVisibleTo in app.json
+Add parameter -SkipUpgrade to allow Run-AlValidation to skip upgrade if previousApps cannot be installed on current version
+Issue #1522 Move files to correct positions
+Issue #1517 Traefik with Run-AlValidation
+Add Text to Run-AlValidation to indicate success or failure
+
+1.0.15
+Use new Generic image location and SQL 2019 image as default (mcr.microsoft.com/businesscentral:{0}-0.1.0.25 is the latest with SQL 2017)
+Issue #1469 Install-NavSipCryptoProvider cannot be executed twice
+Add new function UploadImportAndApply-ConfigPackageInBcContainer, which uses management APIs to Upload, Import and Apply a config package in a container
+Add parameter -ImportTestDataInBcContainer in Run-AlPipeline to allow for overriding and supporting test data
+Add configuration setting: timeStampServer (default timeStampServer for Sign-AppInBcContainer)
+Add parameter timeStampServer to Sign-AppInBcContainer to allow overriding the timeStampServer
+Fix Extract-AppFileToFolder to include missing properties and honor runtime version
+Add parameter vsixFile to Run-AlPipeline
+Add new function Run-AlCops to run AL cops in existing container
+Add new function Run-AlValidation to run and end 2 end AL validation with multiple versions and multiple countries
+Issue #1507 Sort-AppFilesByDependencies crashes if two different versions of the same app is specified
+Issue #1496 Add ruleset parameter to Run-AlPipeline
+Added new function Get-AlLanguageExtensionFromArtifacts to get path of .vsix file within artifacts
+Issue #1506 Add parameter applicationInsightsKey to New-BcContainer and New-BcContainerTenant (note that this requires generic image version 1.0.1.0 or later)
+
+1.0.14
+Add parameter -features to Compile-AppInBcContainer to add support of the alc features parameter
+Add parameter -bakFile to Restore-BcDatabaseFromArtifacts to allow restoring custom database using the artifact binaries
+Issue #1426 performance test samples are installed before performance test toolkit
+Clean-BcContainerDatabase will now cleanup Schema and company when -doNotSaveData is specified
+UnInstall-BcContainerApp will now cleanup Schema when -doNotSaveData is specified together with -doNotSaveSchema
+Regression: Backup-BcContainerDatabases couldn't backup the tenant template database when specified
+Setting default container memory size to 8Gb when using hyperv
+Remove references to specific images
+
+1.0.13
+Issue #1414 the magic setting defaultTenantHasAllowAppDatabaseWrite=Y is not used when using -cleandatabase or -newdatabase
+Add parameter -publishedOnly to Get-BcContainerAppInfo to get published apps (no tenant specified)
+Add parameter -doNotCopyDatabase to New-BcContainerTenant to mount an existing database (move from other container)
+Add parameter -doNotRemoveDatabase to Remove-BcContainerTenant to avoid removing the database (move to other container)
+Add parameter -PublisherAzureActiveDirectoryTenantId to Publish-BcContainerApp
+New function Restore-BcDatabaseFromArtifacts for restoring databases from artifacts on an external sql server
+New function Remove-BcDatabase for removing databases from an external sql server
+New parameters -databasePrefix and -replaceExternalDatabases to New-BcContainer to allow New-BcContainer to create/replace databases on external SQL Server
+Issue #1417 Add parameters -databaseCredential and -compress to Backup-BcContainerDatabases
+Issue #1416 Add parameter -sqlCredential to Run-TestsInBcContainer and Get-TestsFromBcContainer if using external SQL Server
+Issue #1415 Implicitely import the Test Framework in Setup-BcContainerTestUsers if not already installed
+Issue #1426 includePerformanceToolkit should automatically include includeTestToolkit and includeTestFrameWorkOnly (if not specified)
+Publishing apps from a .zip file, where the name isn't .zip caused an error
+Add parameter gitLab to Run-AlPipeline to add support for surfacing test errors on GitLab
+Issue #1430 temp folder is not unique
+Add GitHubActions option to Run-AlPipeline
+Create Temp folder using GetRandomFileName in Download-Artifacts (instead of ticks)
+
+1.0.12
+Issue #1401 set app version if appBuild -or appRevision is specified
+Add function description for Publish-PerTenantExtensionApps and Publish-BuildOutputToStorage
+Support SecureString or String for secrets in Publish-PerTenantExtensionApps and Publish-BuildOutputToStorage
+Fix issue where http://aka.ms/getbc cannot find prerequisites
+
+1.0.11
+Add function Set-BcContainerKeyVaultAadAppAndCertificate to set keyvault AAD App and certificate in container
+Add parameter IncludeEmailAadApp to Create-AadAppsForBC to allow the function to create an Aad App for the new Email feature in 17.1
+Run-AlPipeline support traefik containers in updatelaunchjson
+Add preview function Publish-PerTenantExtensionApps to publish Per Tenant Extension Apps to an online tenant
+Add preview function Publish-BuildOutputToStorage to publish build output to a storage account
+
+1.0.10
+Issue #1369 wrong validateset on tenant
+Issue #1371 missing quotes on volume parameter
+Check all countries when determining artifacts to use
+Issue #1380 Import-TestToolkitToBcContainer fails when license warning occurs
+Issue 1377 Sort-AppFoldersByDependencies didn't support empty arrays
+Allow AppFiles to be an empty array in Sort-AppFilesByDependencies
+Allow previousApps to be present locally (not downloaded from http or https)
+Set default containername in New-BcContainerWizard to bcserver
+Added function Run-ConnectionTestToBcContainer to test that a simple connection to the container is possible
+Update hardcoded image version list
+Update Windows Versions in New-BcImage
+Issue #1392 New-BcContainerWizard closes if font size is too big
+Issue #1384 Concurrency issues with artifacts
+
+1.0.9
+Fix issue when setting bccontainerhelperconfig.defaultnewcontainerparameters.credential in the same session as using it
+Add parameter AllowAppDatabaseWrite to New-BcContainerTenant. Works with generic image 0.1.0.24 or later.
+Merge AdditionalParameters and MyScripts with defaultNewContainerParameters config file settings
+Add build number for Windows 10 20H2
+Do not install the test toolkit before compiling test apps
+Add 2 more overrides ImportTestToolkitToBcContainer and GetBcContainerAppInfo
+Issue #1359 Allow apps to contain test code (but not for AppSource Apps or PTEs)
+Add useGenericImage parameter to run-alpipeline
+Issue #1364 country attribute needs to be case insensitive
+Add parameter additionalCountries to allow Run-AlPipeline to test additional countries during the pipeline
+Issue #1367 - If two processes build the same image at the same time, the second one always rebuilds
+
+1.0.8
+Issue #1329 test whether containername is in hsts preload list
+Add function Sort-AppFilesByDependencies for sorting an array of app files by dependencies
+Sort apps before install in Publish-BcContainerApp
+Add PrevousApps, AppSourceCopMandatoryAffixes and AppSourceCopSupportedCountries to Run-AlPipeline
+Move decision on whether or not to rebuild image from New-BcContainer to New-BcImage and always call
+Add parameter -skipIfImageAlreadyExists to New-BcImage
+Issue #1343 Publish-BcContainerApp with ShowMyCode fails if replaceDependencies is not Set
+Add parameters appPublisher and language to Install-BcContainerApp
+Add parameter appPublisher Sync-BcContainerApp
+Issue #1337 Add tenant parameter to Install-TestToolkitToBcContainer
+Add parameter description to Run-AlPipeline
+Set JUnit as default output from Run-AlPipeline
+
+1.0.7
+Issue #1299 wait for symbol file to be available in container
+Add parameter AssignPremiumPlan to Run-AlPipeline
+Support reading defaultNewContainerParameters from config file
+Add tenant to Run-AlPipeline to allow running the pipeline in a tenant
+Add ability to override functions
+Addiional fixes to Run-AlPipeline
+Issue #1313 -includeAL fails when using a hostHelperFolder, which is different from the containerhelperfolder
+Issue #1316 New-BcContainerWizard converts license file url to lowercase
+Add support for JUnit to Run-Tests
+Add parameter testResultsFormat to Run-AlPipeline
+Do not fail on missing image in New-BcImage (only warn)
+Add properties to JUnit output
+
+1.0.6
+Add 3 new values for Select: Current, NextMinor and NextMajor for selecting artifacts. SasToken needs to be provided for NextMajor and NextMinor
+Publish-BcContainerApp now supports .zip files. All .app files in the .zip file are published in alphabetic order
+Run-AlPipeline to add sequence numbers (dependencies) to apps in artifacts if more than one app is added
+
 1.0.5
 Added PREVIEW function Run-AlPipeline
 Issue #1252 do not return artifact url for artifacts without platform (unless -doNotCheckPlatform is specified)
@@ -7,6 +278,7 @@ Support for -includePerformanceToolkit in New-BcContainerWizard
 Support for insider builds and sasToken in New-BcContainerWizard
 Add NAV to New-BcContainerWizard
 Add AL Language Extension version selection to New-BcContainerWizard
+Flush-ContainerHelperCache will remove images, which was built on artifacts, which is no longer in the cache
 
 1.0.4
 Sort-AppFoldersByDependencies doesn't support custom Application app (needs to be sorted first)

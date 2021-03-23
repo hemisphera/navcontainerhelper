@@ -13,6 +13,8 @@
   Path/Url of the certificate pfx file to use for signing
  .Parameter pfxPassword
   Password of the certificate pfx file
+ .Parameter timeStampServer
+  Specifies the URL of the time stamp server. Default is $bcContainerHelperConfig.timeStampServer, which defaults to http://timestamp.verisign.com/scripts/timestamp.dll
  .Example
   Sign-BcContainerApp -appFile c:\programdata\bccontainerhelper\myapp.app -pfxFile http://my.secure.url/mycert.pfx -pfxPassword $securePassword
  .Example
@@ -26,7 +28,11 @@ function Sign-BcContainerApp {
         [Parameter(Mandatory=$true)]
         [string] $pfxFile,
         [Parameter(Mandatory=$true)]
-        [SecureString] $pfxPassword
+        [SecureString] $pfxPassword,
+        [Parameter(Mandatory=$false)]
+        [string] $timeStampServer = $bcContainerHelperConfig.timeStampServer,
+        [Parameter(Mandatory=$false)]
+        [string] $digestAlgorithm = $bcContainerHelperConfig.digestAlgorithm
     )
 
     $containerAppFile = Get-BcContainerPath -containerName $containerName -path $appFile
@@ -47,13 +53,24 @@ function Sign-BcContainerApp {
     }
 
 
-    Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { Param($appFile, $pfxFile, $pfxPassword)
+    Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { Param($appFile, $pfxFile, $pfxPassword, $timeStampServer, $digestAlgorithm)
 
         if ($pfxFile.ToLower().StartsWith("http://") -or $pfxFile.ToLower().StartsWith("https://")) {
             $pfxUrl = $pfxFile
             $pfxFile = Join-Path "c:\run" ([System.Uri]::UnescapeDataString([System.IO.Path]::GetFileName($pfxUrl).split("?")[0]))
             (New-Object System.Net.WebClient).DownloadFile($pfxUrl, $pfxFile)
             $copied = $true
+        }
+
+        if (!(Test-Path "C:\Windows\System32\msvcr120.dll")) {
+            Write-Host "Downloading vcredist_x86"
+            (New-Object System.Net.WebClient).DownloadFile('https://bcartifacts.azureedge.net/prerequisites/vcredist_x86.exe','c:\run\install\vcredist_x86.exe')
+            Write-Host "Installing vcredist_x86"
+            start-process -Wait -FilePath c:\run\install\vcredist_x86.exe -ArgumentList /q, /norestart
+            Write-Host "Downloading vcredist_x64"
+            (New-Object System.Net.WebClient).DownloadFile('https://bcartifacts.azureedge.net/prerequisites/vcredist_x64.exe','c:\run\install\vcredist_x64.exe')
+            Write-Host "Installing vcredist_x64"
+            start-process -Wait -FilePath c:\run\install\vcredist_x64.exe -ArgumentList /q, /norestart
         }
 
         if (Test-Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\SignTool.exe") {
@@ -73,12 +90,34 @@ function Sign-BcContainerApp {
 
         Write-Host "Signing $appFile"
         $unsecurepassword = ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pfxPassword)))
-        & "$signtoolexe" @("sign", "/f", "$pfxFile", "/p","$unsecurepassword", "/t", "http://timestamp.verisign.com/scripts/timestamp.dll", "$appFile") | Write-Host
+        $attempt = 1
+        $maxAttempts = 5
+        do {
+            try {
+                if ($digestAlgorithm) {
+                    & "$signtoolexe" @("sign", "/f", "$pfxFile", "/p","$unsecurepassword", "/fd", $digestAlgorithm, "/td", $digestAlgorithm, "/tr", "$timeStampServer", "$appFile") | Write-Host
+                }
+                else {
+                    & "$signtoolexe" @("sign", "/f", "$pfxFile", "/p","$unsecurepassword", "/t", "$timeStampServer", "$appFile") | Write-Host
+                }
+                break
+            } catch {
+                if ($attempt -ge $maxAttempts) {
+                    throw
+                }
+                else {
+                    $seconds = [Math]::Pow(4,$attempt)
+                    Write-Host "Signing failed, retrying in $seconds seconds"
+                    $attempt++
+                    Start-Sleep -Seconds $seconds
+                }
+            }
+        } while ($attempt -le $maxAttempts)
 
         if ($copied) { 
             Remove-Item $pfxFile -Force
         }
-    } -ArgumentList $containerAppFile, $containerPfxFile, $pfxPassword
+    } -ArgumentList $containerAppFile, $containerPfxFile, $pfxPassword, $timeStampServer, $digestAlgorithm
 }
 Set-Alias -Name Sign-NavContainerApp -Value Sign-BcContainerApp
 Export-ModuleMember -Function Sign-BcContainerApp -Alias Sign-NavContainerApp
